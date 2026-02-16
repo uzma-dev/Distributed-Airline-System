@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify, render_template_string
 import sqlite3
 import os
+from datetime import datetime, timezone
 
 app = Flask(__name__)
 
@@ -34,7 +35,9 @@ def init_db():
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
         role TEXT NOT NULL,
-        assigned_flight TEXT DEFAULT ''
+        assigned_flight TEXT DEFAULT '',
+        created_at_utc TEXT,
+        assigned_at_utc TEXT
     )
     """)
 
@@ -46,7 +49,6 @@ init_db()
 
 
 # ---------------- WEB CLIENT PAGE ----------------
-
 HTML_PAGE = """(keep your existing HTML exactly as is)"""
 
 
@@ -66,12 +68,17 @@ def add_crew():
     if not data.get("name") or not data.get("role"):
         return jsonify({"error": "Invalid Input"}), 400
 
+    utc_now = datetime.now(timezone.utc).isoformat()
+
     conn = connect_db()
     cur = conn.cursor()
 
     cur.execute(
-        "INSERT INTO crew (name, role) VALUES (?,?)",
-        (data["name"], data["role"])
+        """
+        INSERT INTO crew (name, role, created_at_utc)
+        VALUES (?,?,?)
+        """,
+        (data["name"], data["role"], utc_now)
     )
 
     conn.commit()
@@ -89,7 +96,6 @@ def assign():
     conn = connect_db()
     cur = conn.cursor()
 
-    # Check if ID exists
     cur.execute(
         "SELECT assigned_flight FROM crew WHERE id=?",
         (data["id"],)
@@ -101,23 +107,26 @@ def assign():
         conn.close()
         return jsonify({"error": "ID Not Found"}), 404
 
-    # Check if already assigned
     if row[0] != "":
         conn.close()
         return jsonify({"error": "Already Assigned"}), 409
 
-    # Assign flight
+    utc_now = datetime.now(timezone.utc).isoformat()
+
     cur.execute(
-        "UPDATE crew SET assigned_flight=? WHERE id=?",
-        (data["flight"], data["id"])
+        """
+        UPDATE crew
+        SET assigned_flight=?,
+            assigned_at_utc=?
+        WHERE id=?
+        """,
+        (data["flight"], utc_now, data["id"])
     )
 
     conn.commit()
     conn.close()
 
-    return jsonify({
-        "message": "Flight Assigned"
-    }), 200
+    return jsonify({"message": "Flight Assigned"}), 200
 
 
 # GET CREW DATA
@@ -139,7 +148,9 @@ def crew():
             "id": r[0],
             "name": r[1],
             "role": r[2],
-            "flight": r[3]
+            "flight": r[3],
+            "created_at_utc": r[4],
+            "assigned_at_utc": r[5]
         })
 
     return jsonify(data), 200
