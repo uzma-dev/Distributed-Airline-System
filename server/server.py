@@ -36,8 +36,8 @@ def init_db():
         name TEXT NOT NULL,
         role TEXT NOT NULL,
         assigned_flight TEXT DEFAULT '',
-        created_at_utc TEXT,
-        assigned_at_utc TEXT
+        created_at TEXT,
+        assigned_at TEXT
     )
     """)
 
@@ -68,14 +68,15 @@ def add_crew():
     if not data.get("name") or not data.get("role"):
         return jsonify({"error": "Invalid Input"}), 400
 
-    utc_now = datetime.now(timezone.utc).isoformat()
+    # UTC Time (Safe Method)
+    utc_now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
     conn = connect_db()
     cur = conn.cursor()
 
     cur.execute(
         """
-        INSERT INTO crew (name, role, created_at_utc)
+        INSERT INTO crew (name, role, created_at)
         VALUES (?,?,?)
         """,
         (data["name"], data["role"], utc_now)
@@ -96,6 +97,7 @@ def assign():
     conn = connect_db()
     cur = conn.cursor()
 
+    # Check ID
     cur.execute(
         "SELECT assigned_flight FROM crew WHERE id=?",
         (data["id"],)
@@ -111,13 +113,14 @@ def assign():
         conn.close()
         return jsonify({"error": "Already Assigned"}), 409
 
-    utc_now = datetime.now(timezone.utc).isoformat()
+    # UTC Time
+    utc_now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
     cur.execute(
         """
         UPDATE crew
         SET assigned_flight=?,
-            assigned_at_utc=?
+            assigned_at=?
         WHERE id=?
         """,
         (data["flight"], utc_now, data["id"])
@@ -149,8 +152,8 @@ def crew():
             "name": r[1],
             "role": r[2],
             "flight": r[3],
-            "created_at_utc": r[4],
-            "assigned_at_utc": r[5]
+            "created_at": r[4],
+            "assigned_at": r[5]
         })
 
     return jsonify(data), 200
