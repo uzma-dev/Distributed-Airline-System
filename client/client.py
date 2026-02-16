@@ -104,7 +104,7 @@ def assign_flight():
 
         if res.status_code == 200:
             status.config(
-                text=f"{result['message']} | Logical Time: {result['logical_time']}",
+                text=result["message"],
                 fg="green"
             )
 
@@ -152,7 +152,7 @@ def load_crew():
         for c in data:
             line = (
                 f"ID: {c['id']} | {c['name']} | {c['role']} | "
-                f"Flight: {c['flight']} | Logical Time: {c['logical_time']}"
+                f"Flight: {c['flight']}"
             )
             crew_box.insert(tk.END, line)
 
@@ -163,16 +163,14 @@ def load_crew():
 tk.Button(root, text="Refresh Data", command=load_crew).pack(pady=5)
 
 
-# ---------------- GLOBAL STATE BUTTON ----------------
+# ---------------- SYSTEM STATE ----------------
 def show_system_state():
     try:
         res = requests.get(f"{SERVER_URL}/system_state")
         data = res.json()
 
         status.config(
-            text=f"Total Crew: {data['total_crew']} | "
-                 f"Assigned: {data['assigned_crew']} | "
-                 f"Logical Clock: {data['logical_clock']}",
+            text=f"Total Crew: {data['total_crew']} | Assigned: {data['assigned_crew']}",
             fg="purple"
         )
 

@@ -22,13 +22,6 @@ def connect_db():
 
 
 # ---------------------------
-# GLOBAL LOGICAL CLOCK
-# ---------------------------
-
-logical_clock = 0
-
-
-# ---------------------------
 # INIT DB
 # ---------------------------
 
@@ -41,8 +34,7 @@ def init_db():
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
         role TEXT NOT NULL,
-        assigned_flight TEXT DEFAULT '',
-        logical_time INTEGER DEFAULT 0
+        assigned_flight TEXT DEFAULT ''
     )
     """)
 
@@ -56,7 +48,6 @@ init_db()
 # ---------------- WEB CLIENT PAGE ----------------
 
 HTML_PAGE = """(keep your existing HTML exactly as is)"""
-# (You can keep your existing HTML block unchanged)
 
 
 @app.route("/")
@@ -66,7 +57,7 @@ def web_client():
 
 # ---------------- API ----------------
 
-# 1️⃣ ADD CREW
+# ADD CREW
 @app.route("/add_crew", methods=["POST"])
 def add_crew():
 
@@ -89,17 +80,16 @@ def add_crew():
     return jsonify({"message": "Crew Added"}), 201
 
 
-# 2️⃣ ASSIGN FLIGHT (Lamport + Mutual Exclusion)
+# ASSIGN FLIGHT
 @app.route("/assign", methods=["POST"])
 def assign():
-
-    global logical_clock
 
     data = request.get_json()
 
     conn = connect_db()
     cur = conn.cursor()
 
+    # Check if ID exists
     cur.execute(
         "SELECT assigned_flight FROM crew WHERE id=?",
         (data["id"],)
@@ -111,29 +101,26 @@ def assign():
         conn.close()
         return jsonify({"error": "ID Not Found"}), 404
 
-    # Distributed Mutual Exclusion
+    # Check if already assigned
     if row[0] != "":
         conn.close()
         return jsonify({"error": "Already Assigned"}), 409
 
-    # Increment Lamport Logical Clock
-    logical_clock += 1
-
+    # Assign flight
     cur.execute(
-        "UPDATE crew SET assigned_flight=?, logical_time=? WHERE id=?",
-        (data["flight"], logical_clock, data["id"])
+        "UPDATE crew SET assigned_flight=? WHERE id=?",
+        (data["flight"], data["id"])
     )
 
     conn.commit()
     conn.close()
 
     return jsonify({
-        "message": "Flight Assigned",
-        "logical_time": logical_clock
+        "message": "Flight Assigned"
     }), 200
 
 
-# 3️⃣ GET CREW DATA
+# GET CREW DATA
 @app.route("/crew")
 def crew():
 
@@ -152,14 +139,13 @@ def crew():
             "id": r[0],
             "name": r[1],
             "role": r[2],
-            "flight": r[3],
-            "logical_time": r[4]
+            "flight": r[3]
         })
 
     return jsonify(data), 200
 
 
-# 4️⃣ GLOBAL STATE SNAPSHOT
+# SYSTEM STATE
 @app.route("/system_state")
 def system_state():
 
@@ -176,8 +162,7 @@ def system_state():
 
     return jsonify({
         "total_crew": crew_count,
-        "assigned_crew": assigned_count,
-        "logical_clock": logical_clock
+        "assigned_crew": assigned_count
     }), 200
 
 
